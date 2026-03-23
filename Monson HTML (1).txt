@@ -1,0 +1,267 @@
+<!-- Viewport for mobile scaling -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<div class="calculator-container">
+  <h1>Monson Override Tax Calculator</h1>
+  <p>Start typing your address or enter your assessed property value to estimate your override tax impact.</p>
+
+  <div class="input-group">
+    <label for="addressSearch">Search Address:</label>
+    <input type="text" id="addressSearch" placeholder="Start typing address..." autocomplete="off" aria-autocomplete="list">
+    <ul id="suggestions" role="listbox"></ul>
+  </div>
+
+  <div class="input-group">
+    <label for="assessedValue">Assessed Value ($):</label>
+    <div class="input-button-group">
+      <input type="text" id="assessedValue" placeholder="e.g., 350,000">
+      <button onclick="handleCalculate()">Calculate</button>
+    </div>
+  </div>
+
+  <div id="errorMsg"></div>
+
+  <div class="results">
+    <div id="overrideAmount"></div>
+  </div>
+
+  <p class="disclaimer">
+    <strong>* Intended to be used to project impact on the tax bills of proposed override and should be used as a guide ONLY.</strong><br>
+    <strong>* Does NOT include normal 2.5% levy increase allowed under Proposition 2 ½.</strong><br>
+    <strong>* Does NOT include a breakdown of the yearly increase to reach the above amount.</strong> 
+  </p>
+</div>
+
+<!-- Styles -->
+<style>
+  .calculator-container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  }
+
+  h1 {
+    font-size: 28px;
+    margin-bottom: 10px;
+    color: #2A2393;
+    text-align: left;
+  }
+
+  p {
+    margin-bottom: 20px;
+    font-size: 16px;
+    color: #333;
+  }
+
+  .input-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .input-group label {
+    margin-bottom: 6px;
+    font-weight: bold;
+    width: 100%;
+  }
+
+  .input-group input {
+    padding: 10px;
+    font-size: 16px;
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+
+  .input-button-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    width: 100%;
+  }
+
+  .input-button-group button {
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #2A2393;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  #suggestions {
+    list-style: none;
+    padding: 0;
+    margin-top: 4px;
+    border: 1px solid #ccc;
+    max-height: 150px;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 4px;
+    width: 100%;
+  }
+
+  #suggestions li {
+    padding: 8px;
+    cursor: pointer;
+  }
+
+  #suggestions li:hover,
+  #suggestions li.active {
+    background-color: #e0e0e0;
+  }
+
+  .results {
+    margin-top: 20px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #c0392b;
+  }
+
+  #errorMsg {
+    color: red;
+    font-weight: bold;
+    margin-top: 10px;
+  }
+
+  .disclaimer {
+    font-size: 16px;
+    color: #2A2393;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 600px) {
+    .input-button-group {
+      flex-direction: column;
+    }
+
+    .input-button-group button {
+      width: 100%;
+    }
+  }
+</style>
+
+<!-- PapaParse for CSV -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<!-- JavaScript -->
+<script>
+(function () {
+  const addressMap = {};
+  const addressList = [];
+  let selectedIndex = -1;
+
+  function loadCSVData() {
+    fetch("https://raw.githubusercontent.com/SouthHadleyIT/Monson-OverrideCalculator/refs/heads/main/MonsonData.csv")
+      .then(res => res.text())
+      .then(text => {
+        const parsed = Papa.parse(text, { header: true });
+        parsed.data.forEach(row => {
+          const address = row.Address?.trim();
+          const assessedValue = row.AssessedValue?.trim();
+          if (address && assessedValue) {
+            addressMap[address.toLowerCase()] = assessedValue;
+            addressList.push(address);
+          }
+        });
+        prepareAutocomplete();
+      })
+      .catch(() => {
+        document.getElementById('errorMsg').textContent = "Unable to load property data. Please try again later.";
+      });
+  }
+
+  function prepareAutocomplete() {
+    const input = document.getElementById('addressSearch');
+    const suggestions = document.getElementById('suggestions');
+
+    input.addEventListener('input', () => {
+      const query = input.value.trim().toLowerCase();
+      suggestions.innerHTML = '';
+      selectedIndex = -1;
+      if (!query) return;
+
+      const matches = addressList.filter(addr => addr.toLowerCase().includes(query));
+      matches.forEach((match, index) => {
+        const li = document.createElement('li');
+        li.textContent = match;
+        li.setAttribute('role', 'option');
+        li.addEventListener('click', () => {
+          input.value = match;
+          const rawValue = addressMap[match.toLowerCase()];
+          document.getElementById('assessedValue').value = parseFloat(rawValue).toLocaleString('en-US');
+          suggestions.innerHTML = '';
+        });
+        suggestions.appendChild(li);
+      });
+    });
+
+    input.addEventListener('keydown', (e) => {
+      const items = suggestions.querySelectorAll('li');
+      if (e.key === 'ArrowDown') {
+        selectedIndex = (selectedIndex + 1) % items.length;
+        highlight(items, selectedIndex);
+      } else if (e.key === 'ArrowUp') {
+        selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+        highlight(items, selectedIndex);
+      } else if (e.key === 'Enter' && selectedIndex >= 0) {
+        items[selectedIndex].click();
+        e.preventDefault();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target !== input) suggestions.innerHTML = '';
+    });
+  }
+
+  function highlight(items, index) {
+    items.forEach((item, i) => {
+      item.classList.toggle('active', i === index);
+    });
+  }
+
+  function calculateOverrideBreakdown(assessed) {
+    const rates = { high: 2.39, low: 3.46 };
+    const calc = rate => ((assessed / 1000) * rate).toFixed(2);
+    return { high: calc(rates.high), low: calc(rates.low) };
+  }
+
+  window.handleCalculate = function () {
+    const inputVal = document.getElementById('assessedValue').value;
+    const assessed = parseFloat(inputVal.replace(/,/g, ''));
+    const errorMsg = document.getElementById('errorMsg');
+    errorMsg.textContent = '';
+
+    if (isNaN(assessed) || assessed <= 0) {
+      errorMsg.textContent = "Please enter a valid positive number.";
+      return;
+    }
+
+    const result = calculateOverrideBreakdown(assessed);
+ document.getElementById("overrideAmount").innerHTML = `
+  <p style="color: red;">Estimated RE Tax Impact from $3M Override: <strong>$${parseFloat(result.high).toLocaleString('en-US')}</strong></p>
+  <hr>
+`;
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadCSVData();
+    document.getElementById('assessedValue').addEventListener('input', (e) => {
+      const raw = e.target.value.replace(/,/g, '');
+      if (!isNaN(raw) && raw.length > 0) {
+        e.target.value = parseFloat(raw).toLocaleString('en-US');
+      }
+    });
+  });
+})();
+</script>
