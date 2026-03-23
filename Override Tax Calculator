@@ -28,7 +28,7 @@
   <p class="disclaimer">
     <strong>* Intended to be used to project impact on the tax bills of proposed override and should be used as a guide ONLY.</strong><br>
     <strong>* Does NOT include normal 2.5% levy increase allowed under Proposition 2 Â½.</strong><br>
-    <strong>* Does NOT include a breakdown of the yearly increase to reach the above amount.</strong> 
+    <strong>* Does NOT include impact on CPA Tax and does Not include any new debt exclusion (Fire Station Renovations).</strong> 
   </p>
 </div>
 
@@ -161,7 +161,7 @@
   let selectedIndex = -1;
 
   function loadCSVData() {
-    fetch("https://raw.githubusercontent.com/SouthHadleyIT/Monson-OverrideCalculator/refs/heads/main/MonsonData.csv")
+    fetch("https://raw.githubusercontent.com/drewpehov-cmd/Override-Tax-Calculator/refs/heads/main/MonsonData%20(1).csv")
       .then(res => res.text())
       .then(text => {
         const parsed = Papa.parse(text, { header: true });
